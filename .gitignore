@@ -95,7 +95,7 @@ fabric.properties
 # custom for this project:
 index.html
 download/*
-download/!.gitkeep
+!download/.gitkeep
 images/*
 !images/.gitkeep
 scripts/cache.sqlite
