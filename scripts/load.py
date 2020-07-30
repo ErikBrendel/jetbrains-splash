@@ -32,7 +32,8 @@ ALTERNATIVE_LOGO_POSITIONS = [
 ]
 
 ALTERNATIVE_RESOURCE_JARS = [
-    'branding'
+    'branding',
+    'resources_en',
 ]
 
 IDE_NAMES = [ide[0] for ide in IDE]
