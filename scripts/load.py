@@ -16,19 +16,19 @@ from packaging import version
 #  "*.tar.gz!/<root>/lib/[1].jar!/[2]@2x.png"
 #  <VERSION> will be replaced by eg 20192
 IDE = [
-    ('RD', 'rider', 'rider/artwork/Rider_<VERSION>_splash'),
     ('IIU', 'resources', 'idea_logo'),
     ('WS', 'webstorm', 'artwork/webide_logo'),
     ('PS', 'phpstorm', 'artwork/webide_logo'),
     ('PCP', 'pycharm', 'pycharm_logo'),
     ('CL', 'clion', 'artwork/clion_splash'),
+    ('RD', 'rider', 'rider/artwork/Rider_<VERSION>_splash'),
     ('RM', 'rubymine', 'artwork/rubymine_logo'),
 ]
 
 ALTERNATIVE_LOGO_POSITIONS = [
     'rider/artwork/Rider_<VERSIONDOT>_splash',
-    'rider/artwork/StaticSplash'
-    'rider/artwork/Rider_splash'
+    'rider/artwork/StaticSplash',
+    'rider/artwork/Rider_splash',
 ]
 
 ALTERNATIVE_RESOURCE_JARS = [
@@ -73,7 +73,7 @@ def get_major_download_links(releases: List) -> Dict[version.Version, Tuple[vers
         # the linux one is provided as archive (.tar.gz), also in old versions
         dl: str = release.get('downloads', {}).get('linux', {}).get('link')
         if dl is None:
-            print("ignoring " + str(minor_version) + " because it has no download!")
+            # print("ignoring " + str(minor_version) + " because it has no download!")
             continue
 
         data[major_version] = (minor_version, dl)
@@ -106,6 +106,8 @@ def extract_image(version_and_path: (version.Version, str), ide_name: str, defau
     try:
         t = tarfile.open(version_and_path[1], "r:gz")
         content_dir = os.path.commonprefix(t.getnames())
+        if not content_dir.endswith("/"):
+            content_dir += "/"
         jar_names = [default_jar_name] + ALTERNATIVE_RESOURCE_JARS
         for jar_name in jar_names:
             try:
@@ -119,9 +121,10 @@ def extract_image(version_and_path: (version.Version, str), ide_name: str, defau
                             return image_base_path
             except KeyError:
                 pass  # try next
+        print("Failed! There seems to be no image for that!")
+        return image_base_path
     except KeyError:
         print("Failed! Error! There seems to be no image for that!")
-    print("Failed! There seems to be no image for that!")
     return image_base_path
 
 
