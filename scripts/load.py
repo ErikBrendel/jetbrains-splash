@@ -149,13 +149,20 @@ def extract_to(z: zipfile, zip_file: str, out_dir: str, out_file: str) -> bool:
 
 def generate_result(image_data: Dict[str, List[Tuple[version.Version, str]]]):
     version_data: Dict[version.Version, Dict[str, str]] = {}  # verison -> (ide->img)
+    old_versions: Dict[str, List[str]] = {}  # ide -> images
+    old_version_count = 0
     for ide_name in IDE_NAMES:
+        old_versions[ide_name] = []
         for img_data in image_data.get(ide_name, []):
             v = img_data[0]
             path = img_data[1]
-            if v not in version_data:
-                version_data[v] = {}
-            version_data[v][ide_name] = path
+            if float(str(v)) < 2010:
+                old_versions[ide_name].append(path)
+                old_version_count = max(old_version_count, len(old_versions[ide_name]))
+            else:
+                if v not in version_data:
+                    version_data[v] = {}
+                version_data[v][ide_name] = path
     with open("../index.html", "w") as f:
         f.write("<html><head><title>JetBrains IDE Splash screens</title></head><body>")
         f.write("<table>")
@@ -168,6 +175,16 @@ def generate_result(image_data: Dict[str, List[Tuple[version.Version, str]]]):
                 f.write("<a href=images/" + path + "/logo@2x.png><img src=images/" + path + "/logo.png/></a>")
                 f.write("</td>")
             f.write("</tr>")
+        for i in range(old_version_count):
+            f.write("<tr>")
+            f.write("<td>" + "" + "</td>")
+            for ide_name in IDE_NAMES:
+                path = old_versions[ide_name][i] if i < len(old_versions[ide_name]) else "not_existing"
+                f.write("<td>")
+                f.write("<a href=images/" + path + "/logo@2x.png><img src=images/" + path + "/logo.png/></a>")
+                f.write("</td>")
+            f.write("</tr>")
+
         f.write("</table>")
         f.write("</body></html>")
 
