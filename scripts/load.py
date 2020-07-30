@@ -1,31 +1,38 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3
 
 from urllib.parse import urlparse
 import os
+import shutil
 import sys
 from typing import *
 
 import requests
-import requests_cache
 import tarfile
 import zipfile
 from packaging import version
-
-requests_cache.install_cache()
-
 
 #  the splash images for IDE [0] are found at:
 #  "*.tar.gz!/<root>/lib/[1].jar!/[2].png"
 #  "*.tar.gz!/<root>/lib/[1].jar!/[2]@2x.png"
 #  <VERSION> will be replaced by eg 20192
 IDE = [
+    ('RD', 'rider', 'rider/artwork/Rider_<VERSION>_splash'),
     ('IIU', 'resources', 'idea_logo'),
     ('WS', 'webstorm', 'artwork/webide_logo'),
     ('PS', 'phpstorm', 'artwork/webide_logo'),
     ('PCP', 'pycharm', 'pycharm_logo'),
     ('CL', 'clion', 'artwork/clion_splash'),
-    ('RD', 'rider', 'rider/artwork/Rider_<VERSION>_splash'),
     ('RM', 'rubymine', 'artwork/rubymine_logo'),
+]
+
+ALTERNATIVE_LOGO_POSITIONS = [
+    'rider/artwork/Rider_<VERSIONDOT>_splash',
+    'rider/artwork/StaticSplash'
+    'rider/artwork/Rider_splash'
+]
+
+ALTERNATIVE_RESOURCE_JARS = [
+    'branding'
 ]
 
 IDE_NAMES = [ide[0] for ide in IDE]
@@ -60,7 +67,7 @@ def get_major_download_links(releases: List) -> Dict[version.Version, Tuple[vers
         major_version = version.parse(release['majorVersion'])
         existing_major = data.get(major_version)
         if existing_major is not None and existing_major[0] > minor_version:
-            print("ignoring " + str(minor_version) + " in favor of " + str(existing_major[0]))
+            # print("ignoring " + str(minor_version) + " in favor of " + str(existing_major[0]))
             continue
 
         # the linux one is provided as archive (.tar.gz), also in old versions
@@ -77,7 +84,7 @@ def download_file(url: str) -> str:
     name = os.path.basename(urlparse(url).path)
     local_file = '../download/' + name
     if os.path.isfile(local_file):
-        print("Skipping existing " + name)
+        # print("Skipping existing " + name)
         return local_file
     print("Now downloading " + name + "...")
     download_with_progress(url, local_file)
@@ -87,31 +94,53 @@ def download_file(url: str) -> str:
     return local_file
 
 
-def extract_image(version_and_path: (version.Version, str), ide_name: str, jar_name: str, logo_path: str) -> str:
+def extract_image(version_and_path: (version.Version, str), ide_name: str, default_jar_name: str, default_path: str) -> str:
     name = str(version_and_path[0])
-    logo_path = logo_path.replace("<VERSION>", str(version_and_path[0]).replace(".", ""))
     image_base_path = '../images/' + ide_name + "/" + name
-    result_path = image_base_path + "/" + logo_path
+
     if os.path.isdir(image_base_path):
-        print("Skipping existing " + name)
-        return result_path
+        # print("Skipping existing " + name)
+        return image_base_path
     print("Working on " + name)
+
     try:
         t = tarfile.open(version_and_path[1], "r:gz")
         content_dir = os.path.commonprefix(t.getnames())
-        resources_name = content_dir + "lib/" + jar_name + ".jar"
-        resources_base_path = '../download/resources'
-        t.extract(resources_name, resources_base_path)
-        resources_zip = zipfile.ZipFile(resources_base_path + "/" + resources_name)
-        resources_zip.extract(logo_path + ".png", image_base_path)
-        try:
-            resources_zip.extract(logo_path + "@2x.png", image_base_path)
-        except KeyError:
-            print("Skipping high res image for " + name + ", seems not to exist")
+        jar_names = [default_jar_name] + ALTERNATIVE_RESOURCE_JARS
+        for jar_name in jar_names:
+            try:
+                resources_name = content_dir + "lib/" + jar_name + ".jar"
+                resources_base_path = '../download/resources'
+                t.extract(resources_name, resources_base_path)
+                with zipfile.ZipFile(resources_base_path + "/" + resources_name) as resources_zip:
+                    for logo_path in logo_path_options(default_path, version_and_path[0]):
+                        if extract_to(resources_zip, logo_path + ".png", image_base_path, "logo.png"):
+                            extract_to(resources_zip, logo_path + "@2x.png", image_base_path, "logo@2x.png")
+                            return image_base_path
+            except KeyError:
+                pass  # try next
     except KeyError:
-        print("Failed! There seems to be no image for that!")
-        pass
-    return result_path
+        print("Failed! Error! There seems to be no image for that!")
+    print("Failed! There seems to be no image for that!")
+    return image_base_path
+
+
+def logo_path_options(default_path: str, version: version.Version) -> List[str]:
+    all_paths = [default_path] + ALTERNATIVE_LOGO_POSITIONS
+    return [p.replace("<VERSION>", str(version).replace(".", "")).replace("<VERSIONDOT>", str(version)) for p in
+            all_paths]
+
+
+def extract_to(z: zipfile, zip_file: str, out_dir: str, out_file: str) -> bool:
+    try:
+        with z.open(zip_file) as zf:
+            if not os.path.isdir(out_dir):
+                os.makedirs(out_dir)
+            with open(out_dir + "/" + out_file, 'wb') as f:
+                shutil.copyfileobj(zf, f)
+        return True
+    except KeyError:
+        return False
 
 
 def generate_result(image_data: Dict[str, List[Tuple[version.Version, str]]]):
@@ -132,7 +161,7 @@ def generate_result(image_data: Dict[str, List[Tuple[version.Version, str]]]):
             for ide_name in IDE_NAMES:
                 path = ide_paths.get(ide_name, 'not_existing')
                 f.write("<td>")
-                f.write("<a href=images/" + path + "@2x.png><img src=images/" + path + ".png/></a>")
+                f.write("<a href=images/" + path + "/logo@2x.png><img src=images/" + path + "/logo.png/></a>")
                 f.write("</td>")
             f.write("</tr>")
         f.write("</table>")
@@ -157,7 +186,8 @@ if __name__ == "__main__":
         local_releases = [(version, download_file(download[1])) for (version, download) in downloads.items()]
 
         print_marker("extracting images for " + ide_name)
-        images = [(release[0], extract_image(release, ide_name, ide_info[1], ide_info[2])) for release in local_releases]
+        images = [(release[0], extract_image(release, ide_name, ide_info[1], ide_info[2])) for release in
+                  local_releases]
 
         image_data[ide_name] = images
 
