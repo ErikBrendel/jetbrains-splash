@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import subprocess
 from urllib.parse import urlparse
 import os
 import shutil
@@ -34,6 +34,7 @@ ALTERNATIVE_LOGO_POSITIONS = [
 ALTERNATIVE_RESOURCE_JARS = [
     'branding',
     'resources_en',
+    'app',
 ]
 
 IDE_NAMES = [ide[0] for ide in IDE]
@@ -95,6 +96,17 @@ def download_file(url: str) -> str:
     return local_file
 
 
+def open_zip_file(path: str):
+    try:
+        return zipfile.ZipFile(path, "r")
+    except zipfile.BadZipFile:
+        print("Unprocessable jar file - repacking it as zip!")
+        new_path = path + ".zip"
+        subprocess.call(["arepack", path, new_path, "--quiet"])  # install via "atool", e.g. sudo pamac install atool or sudo apt install atool
+        print("Repack done")
+        return zipfile.ZipFile(new_path, "r")
+
+
 def extract_image(version_and_path: (version.Version, str), ide_name: str, default_jar_name: str, default_path: str) -> str:
     name = str(version_and_path[0])
     image_base_path = '../images/' + ide_name + "/" + name
@@ -115,7 +127,7 @@ def extract_image(version_and_path: (version.Version, str), ide_name: str, defau
                 resources_name = content_dir + "lib/" + jar_name + ".jar"
                 resources_base_path = '../download/resources'
                 t.extract(resources_name, resources_base_path)
-                with zipfile.ZipFile(resources_base_path + "/" + resources_name) as resources_zip:
+                with open_zip_file(resources_base_path + "/" + resources_name) as resources_zip:
                     for logo_path in logo_path_options(default_path, version_and_path[0]):
                         if extract_to(resources_zip, logo_path + ".png", image_base_path, "logo.png"):
                             extract_to(resources_zip, logo_path + "@2x.png", image_base_path, "logo@2x.png")
