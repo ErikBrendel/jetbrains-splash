@@ -29,6 +29,7 @@ ALTERNATIVE_LOGO_POSITIONS = [
     'rider/artwork/Rider_<VERSIONDOT>_splash',
     'rider/artwork/StaticSplash',
     'rider/artwork/Rider_splash',
+    'rider/artwork/release/splash',
 ]
 
 ALTERNATIVE_RESOURCE_JARS = [
